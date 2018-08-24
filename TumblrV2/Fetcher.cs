@@ -14,7 +14,7 @@ namespace TumblrV2
             public Meta Meta { get; set; }
 
             [JsonProperty(PropertyName = "response")]
-            public Response Data { get; set; }
+            public Data Data { get; set; }
         }
 
         private class Meta
@@ -26,7 +26,7 @@ namespace TumblrV2
             public string Message { get; set; }
         }
 
-        private class Response
+        private class Data
         {
             [JsonProperty(PropertyName = "blog")]
             public Blog Blog { get; set; }
@@ -84,11 +84,21 @@ namespace TumblrV2
             this.apiKey = apiKey;
         }
 
-        public async Task<PostSet> GetPostsAsync(string blogName, PostKind postKind)
+        public async Task<PostSet> GetPostsAsync(
+            string blog, Media media, string tag, int offset)
         {
             const string BASEURI = "https://api.tumblr.com/v2/blog/";
 
-            var uri = new Uri($"{BASEURI}{blogName}/posts?api_key={apiKey}");
+            var m = media.ToString().ToLower();
+
+            var url = $"{BASEURI}{blog}/posts/{m}?api_key={apiKey}";
+
+            if (!string.IsNullOrWhiteSpace(tag))
+                url += "&tag=" + tag;
+
+            url += "&offset=" + offset;
+
+            var uri = new Uri(url);
 
             var client = new HttpClient();
 
@@ -101,24 +111,27 @@ namespace TumblrV2
                 throw new Exception("??????????????????????");
             }
 
-            var posts = new PostSet(root.Data.Blog.Name);
+            var posts = new PostSet(blog, media, root.Data.TotalPosts);
 
             foreach (var p in root.Data.Posts)
             {
-                if (!Enum.TryParse(p.Type, true, out PostKind pk))
+                if (!Enum.TryParse(p.Type, true, out Media pk))
                     continue;
 
-                if (pk != postKind)
+                if (pk != media)
+                    continue;
+
+                if (pk == Media.Video && p.VideoType != "tumblr")
                     continue;
 
                 posts.Add(new Post()
                 {
+                    Blog = blog,
                     PostId = p.Id,
                     PostedOn = p.PostedOn,
-                    Kind = postKind,
+                    Media = media,
                     Status = PostStatus.Queued,
                     VideoUri = p.VideoUri,
-                    VideoType = p.VideoType,
                     PhotoUris = p.Photos?.Select(x => x.OriginalSize.Uri).ToList()
                 });
             }

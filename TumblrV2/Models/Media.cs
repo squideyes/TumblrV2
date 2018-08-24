@@ -1,6 +1,6 @@
 ﻿namespace TumblrV2
 {
-    public enum PostKind
+    public enum Media
     {
         Photo = 1,
         Audio = 2,

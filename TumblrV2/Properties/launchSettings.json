@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TumblrV2": {
+      "commandName": "Project",
+      "commandLineArgs": "funnyhalloffame --media VIDEO,PHOTO"
+    }
+  }
+}

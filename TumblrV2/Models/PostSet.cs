@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 
 namespace TumblrV2
@@ -8,16 +7,23 @@ namespace TumblrV2
     {
         private List<Post> posts = new List<Post>();
 
-        internal PostSet(string blogName)
+        internal PostSet(string blog, Media media, int totalPosts)
         {
-            BlogName = blogName;
+            Blog = blog;
+            Media = media;
+            TotalPosts = totalPosts;
         }
 
-        public string BlogName { get; }
+        public string Blog { get; }
+        public Media Media { get; }
+        public int TotalPosts { get;  }
 
         public int Count => posts.Count;
 
         public void Add(Post post) => posts.Add(post);
+
+        public override string ToString() =>
+            $"{posts.Count} {Media.ToString().ToLower()} posts from \"{Blog}\"";
 
         public IEnumerator<Post> GetEnumerator() => posts.GetEnumerator();
 
