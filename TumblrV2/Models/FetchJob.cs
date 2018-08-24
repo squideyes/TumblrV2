@@ -35,8 +35,9 @@ namespace TumblrV2
             }
         }
 
-        public string GetFullPath(string basePath) =>
-            Path.Combine(basePath, Blog, FileName);
+        public string GetFullPath(string basePath) => Path.Combine(basePath, Blog, FileName);
+
+        public bool Exists(string basePath) => File.Exists(GetFullPath(basePath));
 
         public async Task SaveToFileAsync(Stream source, string basePath)
         {

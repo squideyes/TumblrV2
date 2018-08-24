@@ -9,6 +9,7 @@ using TumblrV2.Helpers;
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text;
+using System.IO;
 
 namespace TumblrV2
 {
@@ -34,7 +35,7 @@ namespace TumblrV2
 
             app.HelpOption("-?|--help");
 
-            var blogNameArg = app.Argument("blogname",
+            var blogArg = app.Argument("blogname",
                 "The name of a Tumblr blog (i.e. \"funnyhalloffame[.tumblr.com]\")",
                 true);
 
@@ -56,7 +57,7 @@ namespace TumblrV2
 
             app.OnExecute(async () =>
             {
-                var blog = blogNameArg.Value;
+                var blog = blogArg.Value;
 
                 if (string.IsNullOrWhiteSpace(blog))
                     return ShowHelpAndExit(app, ExitCode.BadBlogName);
@@ -98,7 +99,10 @@ namespace TumblrV2
                 var posts = await GetUnfetchedPostsAsync(
                     fetcher, blog, tag, plan, mediasWithLastPostIds);
 
-                await FetchMediasAsync(posts);
+                if (plan == FilePlan.Purge)
+                    Purge(folder, blog);
+
+                await FetchMediasAsync(folder, plan, posts);
 
                 return ExitCode.Success;
             });
@@ -141,6 +145,17 @@ namespace TumblrV2
             return exitCode;
         }
 
+        private void Purge(string folder, string blog)
+        {
+            var path = Path.Combine(folder, blog);
+
+            path.EnsurePathExists();
+
+            Directory.Delete(path, true);
+
+            logger.LogInformation($"Purged \"{path}\"");
+        }
+
         private FetchJob GetJob(Post post, Uri uri, int? photoNumber)
         {
             return new FetchJob()
@@ -154,7 +169,7 @@ namespace TumblrV2
             };
         }
 
-        private async Task FetchMediasAsync(List<Post> posts)
+        private async Task FetchMediasAsync(string folder, FilePlan plan, List<Post> posts)
         {
             var client = new HttpClient();
 
@@ -169,8 +184,15 @@ namespace TumblrV2
                     }
                     else
                     {
-                        for (int i = 0; i < post.PhotoUris.Count; i++)
-                            jobs.Add(GetJob(post, post.PhotoUris[i], i));
+                        if (post.PhotoUris.Count == 1)
+                        {
+                            jobs.Add(GetJob(post, post.PhotoUris[0], null));
+                        }
+                        else
+                        {
+                            for (int i = 0; i < post.PhotoUris.Count; i++)
+                                jobs.Add(GetJob(post, post.PhotoUris[i], i));
+                        }
                     }
 
                     return jobs;
@@ -179,15 +201,22 @@ namespace TumblrV2
             var fetcher = new ActionBlock<FetchJob>(
                 async job =>
                 {
+                    if (plan == FilePlan.Add && job.Exists(folder))
+                    {
+                        logger.LogDebug($"Skipped \"{job.FileName}\"");
+
+                        return;
+                    }
+
                     var response = await client.GetAsync(job.Uri);
 
                     if (response.IsSuccessStatusCode)
                     {
                         var stream = await response.Content.ReadAsStreamAsync();
 
-                        await job.SaveToFileAsync(stream, "Downloads");
+                        await job.SaveToFileAsync(stream, folder);
 
-                        logger.LogInformation($"Fetched and saved {job.FileName}");
+                        logger.LogInformation($"Fetched \"{job.FileName}\"");
                     }
                     else
                     {
